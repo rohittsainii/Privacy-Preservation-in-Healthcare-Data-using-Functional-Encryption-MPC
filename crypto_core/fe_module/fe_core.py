@@ -27,3 +27,17 @@ def encrypt(mpk, patient_vector):
     r = random.randint(1, PRIME)
     ciphertext = [(x + r) % PRIME for x in patient_vector]
     return ciphertext, r
+
+#Function Key Generation
+
+def keygen(msk, function_vector):
+    #Generate a function key for allowed computation
+    return function_vector
+
+#Secure Computation
+def compute(ciphertext, function_key, r):
+    #Compute function on encrypted vector    
+    masked_result = inner_product(ciphertext, function_key)
+    correction = r * sum(function_key)
+    result = mod_p(masked_result - correction)
+    return result
