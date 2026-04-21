@@ -11,7 +11,7 @@ patient = data[0]
 vector = vector_to_list(patient)
 mpk, msk = setup()
 ciphertext, r = encrypt(mpk, vector)
-function_vector = [1, 0, 0, 0, 0]   # extract age
+function_vector = [0, 1, 0, 0, 0, 0]   # extract age
 function_key = keygen(msk, function_vector)
 result = compute(ciphertext, function_key, r)
 print("Original Vector:", vector)
