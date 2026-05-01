@@ -1,8 +1,10 @@
+
 from crypto_core.fe_module.fe_core import setup, encrypt, keygen
 from crypto_core.fe_module.aggregation import compute_sum, encrypt_dataset
-from crypto_core.fe_module.dataset_utils import generate_dataset, dataset_to_vectors, filter_by_disease
+from crypto_core.utils.generate_dataset import generate_dataset
+from crypto_core.utils.dataset_utils import dataset_to_vectors, filter_by_disease
 from crypto_core.mpc_module.mpc_core import secure_sum
-
+from crypto_core.utils.dataset_utils import encrypt_dataset_raw, decrypt_dataset_raw
 
 # SETUP
 mpk, msk = setup(5)
@@ -13,11 +15,20 @@ hospital_B = generate_dataset(10)
 
 
 def process_hospital(dataset, disease_filter):
-    filtered = filter_by_disease(dataset, disease_filter)
+
+    # 🔐 Step 1: AES encryption (storage simulation)
+    encrypted_raw = encrypt_dataset_raw(dataset)
+
+    # 🔓 Step 2: Decrypt for computation
+    decrypted = decrypt_dataset_raw(encrypted_raw)
+
+    # Step 3: Filter
+    filtered = filter_by_disease(decrypted, disease_filter)
 
     if len(filtered) == 0:
         return 0, 0
 
+    # Step 4: FE pipeline (unchanged)
     vectors = dataset_to_vectors(filtered)
     encrypted_data, masks = encrypt_dataset(mpk, vectors, encrypt)
 
