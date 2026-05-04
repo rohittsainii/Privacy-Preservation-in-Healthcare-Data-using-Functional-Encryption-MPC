@@ -71,5 +71,3 @@ else:
     print("\nFinal Secure Global Average Age:", global_avg)
 
 
-print("\n===== STEP 8: VERIFICATION =====")
-print("Check:", (sum_A + sum_B) / (count_A + count_B))
