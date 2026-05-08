@@ -3,14 +3,7 @@ import { Card, Button, Input, Select, Alert, Badge, MonoValue, Spinner } from '.
 
 const DISEASES = ['None', 'Diabetes', 'Hypertension', 'Cardiac Disease', 'Respiratory', 'Neurological'];
 
-const encryptVector = (patient) => {
-  // Simulate FE encryption matching fe_core.py
-  const PRIME = 2**31 - 1;
-  const r = Math.floor(Math.random() * 1000000) + 1;
-  const vec = [patient.age, patient.gender, patient.disease, patient.blood_pressure, patient.risk_score];
-  const cipher = vec.map(x => ((x + r) % PRIME).toString().slice(0, 12) + '...');
-  return { cipher, r, vec };
-};
+
 
 export default function EncryptPage() {
   const [mode, setMode] = useState('single'); // 'single' | 'batch'
@@ -24,40 +17,108 @@ export default function EncryptPage() {
   const [error, setError] = useState('');
 
   const handleSingleEncrypt = async () => {
-    setError('');
-    setResult(null);
-    const age = parseInt(form.age);
-    const bp = parseInt(form.blood_pressure);
-    const rs = parseInt(form.risk_score);
-    if (!form.patient_id || isNaN(age) || isNaN(bp) || isNaN(rs)) {
-      setError('All fields are required and must be valid numbers.');
+
+  setError('');
+  setResult(null);
+
+  const age = parseInt(form.age);
+  const bp = parseInt(form.blood_pressure);
+  const rs = parseInt(form.risk_score);
+
+  if (
+    !form.patient_id ||
+    isNaN(age) ||
+    isNaN(bp) ||
+    isNaN(rs)
+  ) {
+    setError('All fields are required.');
+    return;
+  }
+
+  setEncrypting(true);
+
+  try {
+
+    const response = await fetch(
+      "http://localhost:5000/api/encrypt",
+      {
+        method: "POST",
+
+        headers: {
+          "Content-Type": "application/json"
+        },
+
+        body: JSON.stringify({
+
+          patient_id: form.patient_id,
+
+          age: age,
+
+          gender: parseInt(form.gender),
+
+          disease: parseInt(form.disease),
+
+          blood_pressure: bp,
+
+          risk_score: rs
+
+        })
+      }
+    );
+
+    const data = await response.json();
+
+    console.log(data);
+
+    if (!data.success) {
+
+      setError(data.error || "Encryption failed");
+
+      setEncrypting(false);
+
       return;
     }
-    setEncrypting(true);
-    await new Promise(r => setTimeout(r, 1200));
-
-    const patient = {
-      age, gender: parseInt(form.gender), disease: parseInt(form.disease),
-      blood_pressure: bp, risk_score: rs,
-    };
-    const { cipher, r: rVal, vec } = encryptVector(patient);
 
     setResult({
-      record_id: `rec_${Date.now().toString(36).toUpperCase()}`,
+
+      record_id: data.record_id,
+
       patient_id: form.patient_id,
-      original_vector: vec,
+
       encrypted_fields: {
-        encrypted_age: cipher[0],
-        encrypted_disease: cipher[2],
-        encrypted_blood_pressure: cipher[3],
-        encrypted_risk_score: cipher[4],
+
+        encrypted_age:
+          data.encrypted_data.age,
+
+        encrypted_gender:
+          data.encrypted_data.gender,
+
+        encrypted_disease:
+          data.encrypted_data.disease,
+
+        encrypted_blood_pressure:
+          data.encrypted_data.blood_pressure,
+
+        encrypted_risk_score:
+          data.encrypted_data.risk_score,
+
       },
-      mask_r: rVal.toString().slice(0, 8) + '...',
+
       timestamp: new Date().toISOString(),
-      stored: true,
+
+      stored: true
     });
-    setEncrypting(false);
-  };
+
+  } catch (err) {
+
+    console.error(err);
+
+    setError("Backend connection failed");
+
+  }
+
+  setEncrypting(false);
+};
 
   const handleFileSelect = (e) => {
     const f = e.target.files[0];
@@ -222,10 +283,6 @@ export default function EncryptPage() {
                     <Badge variant="default">MongoDB ✓</Badge>
                   </div>
                   <div style={{ height: 1, background: 'var(--border-subtle)' }} />
-                  <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginBottom: 4 }}>ORIGINAL VECTOR (discarded)</div>
-                  <div style={{ background: 'var(--bg-surface)', borderRadius: 8, padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: 11, color: '#4d6660' }}>
-                    [{result.original_vector.join(', ')}]
-                  </div>
                   <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginBottom: 4 }}>ENCRYPTED FIELDS (stored)</div>
                   <div style={{ background: 'var(--bg-surface)', borderRadius: 8, padding: '10px 12px', fontFamily: 'var(--font-mono)', fontSize: 10 }}>
                     {Object.entries(result.encrypted_fields).map(([k, v]) => (
