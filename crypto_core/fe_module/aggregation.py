@@ -21,12 +21,7 @@ def compute_sum(encrypted_data, function_key, masks):
     return total
 
 def compute_average(encrypted_data, function_key, masks):
-    total = compute_sum(encrypted_data, function_key, masks)
-    return total / len(encrypted_data)
-
-def compute_average(encrypted_data, function_key, masks):
     if len(encrypted_data) == 0:
-        return 0   # or None
-    
+        return 0
     total = compute_sum(encrypted_data, function_key, masks)
     return total / len(encrypted_data)
