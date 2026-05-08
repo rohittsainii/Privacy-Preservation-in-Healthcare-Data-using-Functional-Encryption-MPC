@@ -58,18 +58,88 @@ const CustomTooltip = ({ active, payload, label }) => {
 export default function DashboardPage() {
   const { user } = useAuth();
   const [tick, setTick] = useState(0);
+  const [realStats, setRealStats] = useState({
 
+  totalRecords: 0,
+  todayEncryptions: 0,
+  activeMPCSessions: 0,
+  totalComputations: 0
+
+});
   useEffect(() => {
-    const t = setInterval(() => setTick(v => v + 1), 3000);
-    return () => clearInterval(t);
-  }, []);
+
+  fetchStats();
+
+  const t = setInterval(() => {
+
+    setTick(v => v + 1);
+
+    fetchStats();
+
+  }, 3000);
+
+  return () => clearInterval(t);
+
+}, []);
+
+
+const fetchStats = async () => {
+
+  try {
+
+    const response = await fetch(
+      'http://localhost:5000/api/stats'
+    );
+
+    const data = await response.json();
+
+    if (data.success) {
+
+      setRealStats(data.stats);
+    }
+
+  } catch (err) {
+
+    console.error(err);
+  }
+};
 
   const stats = [
-    { label: 'Encrypted Records', value: '8,472', delta: '+47 today', color: '#20c8a0', icon: '⊕' },
-    { label: 'Compute Requests', value: '1,241', delta: '+12 today', color: '#8b5cf6', icon: '∑' },
-    { label: 'Active MPC Sessions', value: '3', delta: 'live', color: '#0ea5e9', icon: '⋈', live: true },
-    { label: 'Function Keys Issued', value: '89', delta: '+2 today', color: '#f59e0b', icon: '⌗' },
-  ];
+
+  {
+    label: 'Encrypted Records',
+    value: realStats.totalRecords,
+    delta: `${realStats.todayEncryptions} today`,
+    color: '#20c8a0',
+    icon: '⊕'
+  },
+
+  {
+  label: 'FE Computations',
+  value: realStats.totalComputations,
+  delta: 'secure queries',
+  color: '#8b5cf6',
+  icon: '∑'
+  },
+
+  {
+  label: 'MPC Aggregations',
+  value: realStats.activeMPCSessions,
+  delta: 'simulated',
+  color: '#0ea5e9',
+  icon: '⋈',
+  live: true
+},
+
+  {
+    label: 'Function Keys Issued',
+    value: '89',
+    delta: '+2 today',
+    color: '#f59e0b',
+    icon: '⌗'
+  }
+
+];
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 1200, margin: '0 auto' }}>

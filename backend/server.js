@@ -175,26 +175,26 @@ app.post('/api/encrypt', async (req, res) => {
 
     // SAVE TO DATABASE
 
-    // const record = new EncryptedPatientData({
+      const record = new EncryptedPatientData({
 
-//   record_id,
+      record_id,
 
-//   patient_id,
+      patient_id,
 
-//   encrypted_age: encrypted.age,
-//   encrypted_gender: encrypted.gender,
-//   encrypted_disease: encrypted.disease,
-//   encrypted_blood_pressure:
-//     encrypted.blood_pressure,
-//   encrypted_risk_score:
-//     encrypted_risk_score,
+      encrypted_age: encrypted.age,
+      encrypted_gender: encrypted.gender,
+      encrypted_disease: encrypted.disease,
+      encrypted_blood_pressure:
+        encrypted.blood_pressure,
+      encrypted_risk_score:
+        encrypted.risk_score,
 
-//   timestamp: new Date(),
-// });
+      timestamp: new Date(),
+    });
 
-// await record.save();
+     await record.save();
 
-    // await record.save();
+   
 
     audit(
       'ENCRYPT',
@@ -218,7 +218,34 @@ app.post('/api/encrypt', async (req, res) => {
     });
   }
 });
+// ============================================
+// GET ALL ENCRYPTED RECORDS
+// ============================================
 
+app.get('/api/records', async (req, res) => {
+
+  try {
+
+    const records = await EncryptedPatientData
+      .find()
+      .sort({ timestamp: -1 });
+
+    res.json({
+      success: true,
+      count: records.length,
+      records
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+      success: false,
+      error: err.message
+    });
+  }
+});
 // ─────────────────────────────────────────────
 // REQUEST FUNCTION KEY
 // ─────────────────────────────────────────────
@@ -366,34 +393,107 @@ app.get('/api/records', async (req, res) => {
     });
   }
 });
+// ============================================
+// DASHBOARD STATS
+// ============================================
 
+app.get('/api/stats', async (req, res) => {
+
+  try {
+
+    const totalRecords =
+      await EncryptedPatientData.countDocuments();
+
+    const today = new Date();
+
+    today.setHours(0, 0, 0, 0);
+
+    const todayEncryptions =
+      await EncryptedPatientData.countDocuments({
+
+        timestamp: { $gte: today }
+
+      });
+
+    res.json({
+
+      success: true,
+
+      stats: {
+
+        totalRecords,
+
+        todayEncryptions,
+
+        activeMPCSessions: 3,
+
+        totalComputations: 12
+
+      }
+
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+
+      success: false,
+      error: err.message
+
+    });
+  }
+});
 // ─────────────────────────────────────────────
 // GET STATS
 // ─────────────────────────────────────────────
 
 app.get('/api/stats', async (req, res) => {
+
   try {
+
     const totalRecords =
       await EncryptedPatientData.countDocuments();
 
-    const totalComputations =
-      await ComputationRequest.countDocuments();
+    const today = new Date();
 
-    const totalResults =
-      await ComputationResult.countDocuments();
+    today.setHours(0, 0, 0, 0);
+
+    const todayEncryptions =
+      await EncryptedPatientData.countDocuments({
+
+        timestamp: { $gte: today }
+
+      });
 
     res.json({
-      totalRecords,
-      totalComputations,
-      totalResults,
 
-      systemStatus: 'operational',
+      success: true,
+
+      stats: {
+
+        totalRecords,
+
+        todayEncryptions,
+
+        activeMPCSessions: 3,
+
+        totalComputations: 12
+
+      }
+
     });
+
   } catch (err) {
+
     console.error(err);
 
     res.status(500).json({
-      error: err.message,
+
+      success: false,
+      error: err.message
+
     });
   }
 });
@@ -416,11 +516,11 @@ app.get('/api/audit', (req, res) => {
 mongoose
   .connect(MONGODB_URI)
   .then(() => {
-    console.log('✅ MongoDB Connected');
+    console.log('MongoDB Connected');
 
     app.listen(PORT, () => {
       console.log(
-        `🚀 Backend running on http://localhost:${PORT}`
+        `Backend running on http://localhost:${PORT}`
       );
     });
   })
