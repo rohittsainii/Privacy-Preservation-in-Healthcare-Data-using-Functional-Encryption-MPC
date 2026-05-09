@@ -9,23 +9,7 @@ const FUNCTIONS = [
   { value: 'risk_score_by_disease', label: 'Risk by Disease', desc: 'Average risk score per disease group', icon: '⊟', vector: '[0,0,1,0,1]' },
 ];
 
-const MOCK_RESULTS = {
-  average_age: { value: 52.3, unit: 'years', details: { count: 1247, min: 18, max: 89, std: 15.2 } },
-  disease_frequency: {
-    value: null, unit: '', breakdown: [
-      { name: 'None', count: 312 }, { name: 'Diabetes', count: 287 }, { name: 'Hypertension', count: 224 },
-      { name: 'Cardiac', count: 198 }, { name: 'Respiratory', count: 152 }, { name: 'Neurological', count: 74 },
-    ]
-  },
-  average_risk_score: { value: 61.7, unit: '', details: { count: 1247, min: 1, max: 100, std: 22.4 } },
-  blood_pressure_avg: { value: 128.4, unit: 'mmHg', details: { count: 1247, min: 90, max: 160, std: 18.1 } },
-  risk_score_by_disease: {
-    value: null, unit: '', breakdown: [
-      { name: 'Diabetes', avg: 71.2 }, { name: 'Cardiac', avg: 79.8 },
-      { name: 'Hypertension', avg: 65.4 }, { name: 'Respiratory', avg: 58.1 },
-    ]
-  },
-};
+
 
 export default function ComputePage() {
   const [selectedFn, setSelectedFn] = useState('average_age');
@@ -46,14 +30,90 @@ export default function ComputePage() {
   };
 
   const handleCompute = async () => {
+
+  try {
+
     setComputing(true);
+
     setResult(null);
-    await new Promise(r => setTimeout(r, 2000));
-    const id = `comp_${Date.now().toString(36).toUpperCase()}`;
-    setComputeId(id);
-    setResult({ ...MOCK_RESULTS[selectedFn], functionType: selectedFn, timestamp: new Date().toISOString(), computeId: id, recordCount: 1247 });
+
+    const response = await fetch(
+
+      'http://localhost:3000/api/compute',
+
+      {
+        method: 'POST',
+
+        headers: {
+          'Content-Type': 'application/json'
+        },
+
+        body: JSON.stringify({
+
+          function_type: selectedFn,
+
+          filters: filter
+
+        })
+
+      }
+    );
+
+
+
+    const data =
+      await response.json();
+
+
+
+    if (data.success) {
+
+      const id =
+        `comp_${Date.now()
+          .toString(36)
+          .toUpperCase()}`;
+
+
+
+      setComputeId(id);
+
+
+
+      setResult({
+
+        ...data.result,
+
+        functionType: selectedFn,
+
+        timestamp:
+          new Date().toISOString(),
+
+        computeId: id,
+
+        recordCount: 1247
+
+      });
+
+    } else {
+
+      alert(
+        'Computation failed'
+      );
+    }
+
+  } catch (err) {
+
+    console.error(err);
+
+    alert(
+      'Backend connection failed'
+    );
+
+  } finally {
+
     setComputing(false);
-  };
+  }
+};
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 1000, margin: '0 auto' }}>

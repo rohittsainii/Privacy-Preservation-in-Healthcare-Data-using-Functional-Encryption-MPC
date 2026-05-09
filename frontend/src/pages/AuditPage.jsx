@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Badge, MonoValue, Select, Input, Spinner, Alert } from '../components/UI';
-import { getAuditLogs } from '../services/api';
+
 
 const TYPE_CONFIG = {
   ENCRYPT: { color: '#20c8a0', variant: 'default' },
@@ -21,24 +21,75 @@ export default function AuditPage() {
   const [search, setSearch] = useState('');
 
   useEffect(() => {
-    getAuditLogs()
-      .then(res => setLogs(res.data.logs || []))
-      .catch(() => setError('Failed to load audit logs from server.'))
-      .finally(() => setLoading(false));
-  }, []);
+
+  fetchAuditLogs();
+
+}, []);
+
+
+const fetchAuditLogs = async () => {
+
+  try {
+
+    const response = await fetch(
+      'http://localhost:3000/api/audit-logs'
+    );
+
+    const data = await response.json();
+
+    console.log(data);
+
+    if (data.success) {
+
+      setLogs(data.logs || []);
+
+    } else {
+
+      setError(
+        'Failed to load audit logs from server.'
+      );
+    }
+
+  } catch (err) {
+
+    console.error(err);
+
+    setError(
+      'Backend connection failed.'
+    );
+  } finally {
+
+    setLoading(false);
+  }
+};
 
   const filtered = logs.filter(l => {
-    if (typeFilter !== 'all' && l.type !== typeFilter) return false;
-    if (statusFilter !== 'all' && l.status !== statusFilter) return false;
-    if (search && !l.user_id?.includes(search) && !l.action?.includes(search) && !l.id?.includes(search)) return false;
-    return true;
-  });
+
+  if (
+    typeFilter !== 'all' &&
+    l.action !== typeFilter
+  ) return false;
+
+  if (
+    statusFilter !== 'all' &&
+    l.status !== statusFilter
+  ) return false;
+
+  if (
+    search &&
+    !l.user?.includes(search) &&
+    !l.details?.includes(search) &&
+    !l._id?.includes(search)
+  ) return false;
+
+  return true;
+});
 
   const stats = {
     total: logs.length,
     success: logs.filter(l => l.status === 'success').length,
     failed: logs.filter(l => l.status === 'failed').length,
-    denied: logs.filter(l => l.type === 'ACCESS_DENIED').length,
+    denied: 0,
   };
 
   if (loading) return (
@@ -127,7 +178,7 @@ export default function AuditPage() {
             <tbody>
               {filtered.map((log, i) => (
                 <tr
-                  key={log.id}
+                  key={log._id}
                   style={{
                     borderBottom: '1px solid var(--border-subtle)',
                     transition: 'background 0.1s',
@@ -137,17 +188,17 @@ export default function AuditPage() {
                   onMouseLeave={e => e.currentTarget.style.background = i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)'}
                 >
                   <td style={{ padding: '10px 16px' }}>
-                    <MonoValue style={{ fontSize: 10 }}>{log.id}</MonoValue>
+                    <MonoValue style={{ fontSize: 10 }}>{log._id}</MonoValue>
                   </td>
                   <td style={{ padding: '10px 16px' }}>
-                    <Badge variant={TYPE_CONFIG[log.type]?.variant || 'muted'}>{log.type}</Badge>
+                    <Badge variant={TYPE_CONFIG[log.action]?.variant || 'muted'}>{log.action}</Badge>
                   </td>
                   <td style={{ padding: '10px 16px' }}>
-                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{log.user_id}</span>
+                    <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{log.user}</span>
                   </td>
                   <td style={{ padding: '10px 16px' }}>
                     <span style={{ fontSize: 11, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                      {log.action}{log.details ? ` · ${log.details}` : ''}
+                      {log.details}
                     </span>
                   </td>
                   <td style={{ padding: '10px 16px' }}>
@@ -162,7 +213,7 @@ export default function AuditPage() {
                     </div>
                   </td>
                   <td style={{ padding: '10px 16px' }}>
-                    <MonoValue style={{ fontSize: 10 }}>{log.ip}</MonoValue>
+                    <MonoValue style={{ fontSize: 10 }}>LOCALHOST</MonoValue>
                   </td>
                   <td style={{ padding: '10px 16px' }}>
                     <span style={{ fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)', whiteSpace: 'nowrap' }}>
