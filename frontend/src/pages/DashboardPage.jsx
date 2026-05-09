@@ -159,7 +159,7 @@ export default function DashboardPage() {
       // ======================================
 
       const response = await fetch(
-        'http://localhost:5000/api/stats'
+        'http://localhost:3000/api/stats'
       );
 
       const data = await response.json();
@@ -176,7 +176,7 @@ export default function DashboardPage() {
 
       const analyticsResponse =
         await fetch(
-          'http://localhost:5000/api/dashboard-analytics'
+          'http://localhost:3000/api/dashboard-analytics'
         );
 
       const analyticsData =

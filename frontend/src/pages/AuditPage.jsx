@@ -32,7 +32,7 @@ const fetchAuditLogs = async () => {
   try {
 
     const response = await fetch(
-      'http://localhost:5000/api/audit-logs'
+      'http://localhost:3000/api/audit-logs'
     );
 
     const data = await response.json();

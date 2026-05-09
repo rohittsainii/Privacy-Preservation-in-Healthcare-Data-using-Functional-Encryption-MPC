@@ -17,7 +17,7 @@ export function RecordsPage() {
     try {
 
       const response = await fetch(
-        'http://localhost:5000/api/records'
+        'http://localhost:3000/api/records'
       );
 
       const data = await response.json();
@@ -242,7 +242,7 @@ export function ResultsPage() {
     try {
 
       const response = await fetch(
-        'http://localhost:5000/api/results'
+        'http://localhost:3000/api/results'
       );
 
       const data =
