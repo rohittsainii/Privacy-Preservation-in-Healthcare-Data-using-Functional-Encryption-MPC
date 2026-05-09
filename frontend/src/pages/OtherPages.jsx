@@ -219,6 +219,62 @@ export function RecordsPage() {
 
 export function ResultsPage() {
 
+  const [results, setResults] =
+    React.useState([]);
+
+  const [loading, setLoading] =
+    React.useState(true);
+
+  const [error, setError] =
+    React.useState('');
+
+
+  React.useEffect(() => {
+
+    fetchResults();
+
+  }, []);
+
+
+
+  const fetchResults = async () => {
+
+    try {
+
+      const response = await fetch(
+        'http://localhost:5000/api/results'
+      );
+
+      const data =
+        await response.json();
+
+      if (data.success) {
+
+        setResults(data.results);
+
+      } else {
+
+        setError(
+          'Failed to fetch results'
+        );
+      }
+
+    } catch (err) {
+
+      console.error(err);
+
+      setError(
+        'Backend connection failed'
+      );
+
+    } finally {
+
+      setLoading(false);
+    }
+  };
+
+
+
   return (
 
     <div
@@ -230,9 +286,173 @@ export function ResultsPage() {
       }}
     >
 
-      <h1 style={{ fontSize: '40px' }}>
-        Results Page
+      <h1
+        style={{
+          fontSize: '42px',
+          marginBottom: '10px'
+        }}
+      >
+        Secure Computation Results
       </h1>
+
+      <p
+        style={{
+          color: '#94a3b8',
+          marginBottom: '40px'
+        }}
+      >
+        Functional Encryption and MPC
+        computation history
+      </p>
+
+
+
+      {loading && (
+
+        <div
+          style={{
+            color: '#22d3ee'
+          }}
+        >
+          Loading results...
+        </div>
+      )}
+
+
+
+      {error && (
+
+        <div
+          style={{
+            background: '#450a0a',
+            border: '1px solid red',
+            padding: '12px',
+            borderRadius: '10px',
+            marginBottom: '20px',
+            color: '#f87171'
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+
+
+      <div
+        style={{
+          display: 'grid',
+          gap: '20px'
+        }}
+      >
+
+        {results.map((result) => (
+
+          <div
+            key={result._id}
+            style={{
+              background: '#0f172a',
+              border: '1px solid #312e81',
+              borderRadius: '18px',
+              padding: '24px'
+            }}
+          >
+
+            <div
+              style={{
+                display: 'flex',
+                justifyContent:
+                  'space-between',
+                marginBottom: '20px'
+              }}
+            >
+
+              <div>
+
+                <h2
+                  style={{
+                    color: '#a78bfa',
+                    fontSize: '22px'
+                  }}
+                >
+                  {result.result_id}
+                </h2>
+
+                <div
+                  style={{
+                    color: '#94a3b8',
+                    fontSize: '14px'
+                  }}
+                >
+                  Function:
+                  {' '}
+                  {result.function_type}
+                </div>
+
+              </div>
+
+
+              <div
+                style={{
+                  color: '#4ade80'
+                }}
+              >
+                Computed ✓
+              </div>
+
+            </div>
+
+
+
+            <div
+              style={{
+                display: 'grid',
+                gap: '14px'
+              }}
+            >
+
+              <div>
+
+                <strong>
+                  Computed Result:
+                </strong>
+
+                <div
+                  style={{
+                    marginTop: '6px',
+                    color: '#c4b5fd'
+                  }}
+                >
+                  {JSON.stringify(
+                    result.computed_value,
+                    null,
+                    2
+                  )}
+                </div>
+
+              </div>
+
+            </div>
+
+
+
+            <div
+              style={{
+                marginTop: '18px',
+                fontSize: '12px',
+                color: '#64748b'
+              }}
+            >
+              Generated At:
+              {' '}
+              {new Date(
+                result.generated_time
+              ).toLocaleString()}
+            </div>
+
+          </div>
+        ))}
+
+      </div>
 
     </div>
   );

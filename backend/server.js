@@ -4,19 +4,30 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 
+const multer = require('multer');
+const csv = require('csv-parser');
+const fs = require('fs');
+const path = require('path');
+
+const AuditLog =
+  require('./models/AuditLog');
+
 dotenv.config();
 
 const app = express();
 
-const PORT = process.env.PORT || 5000;
+const PORT =
+  process.env.PORT || 5000;
 
 const MONGODB_URI =
   process.env.MONGODB_URI ||
   'mongodb://localhost:27017/healthcare_privacy';
 
-// ─────────────────────────────────────────────
-// Middleware
-// ─────────────────────────────────────────────
+
+
+// =====================================================
+// MIDDLEWARE
+// =====================================================
 
 app.use(
   cors({
@@ -27,213 +38,601 @@ app.use(
 
 app.use(express.json());
 
-// ─────────────────────────────────────────────
-// MongoDB Schemas
-// ─────────────────────────────────────────────
 
-const encryptedPatientSchema = new mongoose.Schema({
-  record_id: { type: String, unique: true },
 
-  patient_id: String,
+// =====================================================
+// FILE UPLOAD
+// =====================================================
 
-  encrypted_age: String,
-  encrypted_gender: String,
-  encrypted_disease: String,
-  encrypted_blood_pressure: String,
-  encrypted_risk_score: String,
-
-  timestamp: {
-    type: Date,
-    default: Date.now,
-  },
+const upload = multer({
+  dest: 'uploads/',
 });
 
-const computationRequestSchema = new mongoose.Schema({
-  request_id: String,
-  user_id: String,
-  function_type: String,
 
-  request_time: {
-    type: Date,
-    default: Date.now,
-  },
 
-  status: {
-    type: String,
-    default: 'pending',
-  },
-});
+// =====================================================
+// MONGODB SCHEMAS
+// =====================================================
 
-const computationResultSchema = new mongoose.Schema({
-  result_id: String,
+const encryptedPatientSchema =
+  new mongoose.Schema({
 
-  function_type: String,
+    record_id: {
+      type: String,
+      unique: true
+    },
 
-  computed_value: mongoose.Schema.Types.Mixed,
+    patient_id: String,
 
-  generated_time: {
-    type: Date,
-    default: Date.now,
-  },
+    encrypted_age: String,
 
-  request_id: String,
-});
+    encrypted_gender: String,
 
-const EncryptedPatientData = mongoose.model(
-  'EncryptedPatientData',
-  encryptedPatientSchema
-);
+    encrypted_disease: String,
 
-const ComputationRequest = mongoose.model(
-  'ComputationRequest',
-  computationRequestSchema
-);
+    encrypted_blood_pressure: String,
 
-const ComputationResult = mongoose.model(
-  'ComputationResult',
-  computationResultSchema
-);
+    encrypted_risk_score: String,
 
-// ─────────────────────────────────────────────
-// Helpers
-// ─────────────────────────────────────────────
+    disease_category: String,
+
+    upload_source: {
+
+      type: String,
+
+      default: 'manual'
+
+    },
+
+    timestamp: {
+
+      type: Date,
+
+      default: Date.now,
+
+    },
+
+  });
+
+
+
+const computationResultSchema =
+  new mongoose.Schema({
+
+    result_id: String,
+
+    function_type: String,
+
+    computed_value:
+      mongoose.Schema.Types.Mixed,
+
+    generated_time: {
+
+      type: Date,
+
+      default: Date.now,
+
+    },
+
+  });
+
+
+
+// =====================================================
+// MODELS
+// =====================================================
+
+const EncryptedPatientData =
+  mongoose.model(
+    'EncryptedPatientData',
+    encryptedPatientSchema
+  );
+
+
+
+const ComputationResult =
+  mongoose.model(
+    'ComputationResult',
+    computationResultSchema
+  );
+
+
+
+// =====================================================
+// HELPERS
+// =====================================================
 
 function generateRecordId() {
+
   return `REC_${Date.now()}_${Math.floor(
     Math.random() * 10000
   )}`;
 }
 
-// ─────────────────────────────────────────────
-// Audit Logs
-// ─────────────────────────────────────────────
 
-const auditLogs = [];
 
-function audit(type, user_id, action, status, details = '') {
-  auditLogs.unshift({
-    id: `LOG_${Date.now()}`,
-    type,
-    user_id,
-    action,
-    status,
-    details,
-    timestamp: new Date().toISOString(),
-  });
-
-  if (auditLogs.length > 500) {
-    auditLogs.pop();
-  }
-}
-
-// ─────────────────────────────────────────────
-// Routes
-// ─────────────────────────────────────────────
-
-// Health Check
+// =====================================================
+// HEALTH ROUTE
+// =====================================================
 
 app.get('/api/health', (req, res) => {
+
   res.json({
+
     status: 'ok',
-    timestamp: new Date().toISOString(),
+
+    timestamp:
+      new Date().toISOString(),
+
   });
 });
 
-// ─────────────────────────────────────────────
-// REAL ENCRYPTION ROUTE
-// ─────────────────────────────────────────────
+
+
+// =====================================================
+// ENCRYPT ROUTE
+// =====================================================
 
 app.post('/api/encrypt', async (req, res) => {
+
   try {
+
     const {
+
       patient_id,
       age,
       gender,
       disease,
       blood_pressure,
       risk_score,
-      user_id = 'unknown',
+
     } = req.body;
 
-    // CALL PYTHON CRYPTO API
 
-    const cryptoResponse = await axios.post(
-      'http://127.0.0.1:5001/encrypt',
-      {
-        age,
-        gender,
-        disease,
-        blood_pressure,
-        risk_score,
-      }
-    );
+
+    // =========================================
+    // CALL PYTHON CRYPTO API
+    // =========================================
+
+    const cryptoResponse =
+      await axios.post(
+
+        'http://127.0.0.1:5001/encrypt',
+
+        {
+
+          age,
+          gender,
+          disease,
+          blood_pressure,
+          risk_score,
+
+        }
+
+      );
+
+
 
     const encrypted =
-      cryptoResponse.data.encrypted_data;
+      cryptoResponse.data
+        .encrypted_data;
 
-    const record_id = generateRecordId();
 
-    // SAVE TO DATABASE
 
-      const record = new EncryptedPatientData({
+    const record_id =
+      generateRecordId();
 
-      record_id,
 
-      patient_id,
 
-      encrypted_age: encrypted.age,
-      encrypted_gender: encrypted.gender,
-      encrypted_disease: encrypted.disease,
-      encrypted_blood_pressure:
-        encrypted.blood_pressure,
-      encrypted_risk_score:
-        encrypted.risk_score,
+    // =========================================
+    // SAVE RECORD
+    // =========================================
 
-      timestamp: new Date(),
+    const record =
+      new EncryptedPatientData({
+
+        record_id,
+
+        patient_id,
+
+        encrypted_age:
+          encrypted.age,
+
+        encrypted_gender:
+          encrypted.gender,
+
+        encrypted_disease:
+          encrypted.disease,
+
+        encrypted_blood_pressure:
+          encrypted.blood_pressure,
+
+        encrypted_risk_score:
+          encrypted.risk_score,
+
+        disease_category:
+          disease,
+
+        upload_source:
+          'manual',
+
+        timestamp:
+          new Date(),
+
+      });
+
+    await record.save();
+
+
+
+    // =========================================
+    // AUDIT LOG
+    // =========================================
+
+    await AuditLog.create({
+
+      action: 'ENCRYPT',
+
+      user: 'admin',
+
+      details:
+        `Encrypted patient ${patient_id}`,
+
+      status: 'success'
+
     });
 
-     await record.save();
 
-   
-
-    audit(
-      'ENCRYPT',
-      user_id,
-      `Encrypted patient ${patient_id}`,
-      'success'
-    );
 
     res.json({
+
       success: true,
-      message: 'Patient encrypted successfully',
+
+      message:
+        'Patient encrypted successfully',
+
       record_id,
-      encrypted_data: encrypted,
+
+      encrypted_data:
+        encrypted,
+
     });
+
   } catch (err) {
+
     console.error(err);
 
     res.status(500).json({
+
       success: false,
-      error: err.message,
+
+      error:
+        err.message,
+
     });
   }
 });
-// ============================================
-// GET ALL ENCRYPTED RECORDS
-// ============================================
+
+
+
+// =====================================================
+// BATCH CSV UPLOAD
+// =====================================================
+
+app.post(
+
+  '/api/upload/batch',
+
+  upload.single('file'),
+
+  async (req, res) => {
+
+    try {
+
+      if (!req.file) {
+
+        return res.status(400).json({
+
+          success: false,
+
+          message:
+            'No CSV file uploaded'
+
+        });
+      }
+
+
+
+      const rows = [];
+
+
+
+      fs.createReadStream(req.file.path)
+
+        .pipe(csv())
+
+        .on('data', (data) => {
+
+          rows.push(data);
+
+        })
+
+        .on('end', async () => {
+
+          try {
+
+            let uploaded = 0;
+
+            let failed = 0;
+
+            const errors = [];
+
+
+
+            // =====================================
+            // PROCESS EACH ROW
+            // =====================================
+
+            for (const row of rows) {
+
+              try {
+
+                // ===============================
+                // VALIDATION
+                // ===============================
+
+                if (
+
+                  !row.patient_id ||
+
+                  !row.age ||
+
+                  !row.disease
+
+                ) {
+
+                  failed++;
+
+                  errors.push({
+
+                    patient_id:
+                      row.patient_id || 'UNKNOWN',
+
+                    reason:
+                      'Missing required fields'
+
+                  });
+
+                  continue;
+                }
+
+
+
+                // ===============================
+                // CALL PYTHON CRYPTO API
+                // ===============================
+
+                const cryptoResponse =
+                  await axios.post(
+
+                    'http://127.0.0.1:5001/encrypt',
+
+                    {
+
+                      age:
+                        row.age || '',
+
+                      gender:
+                        row.gender || '',
+
+                      disease:
+                        row.disease || '',
+
+                      blood_pressure:
+                        row.blood_pressure || '',
+
+                      risk_score:
+                        row.risk_score || '',
+
+                    }
+
+                  );
+
+
+
+                const encrypted =
+                  cryptoResponse.data
+                    .encrypted_data;
+
+
+
+                // ===============================
+                // CREATE RECORD
+                // ===============================
+
+                const record =
+                  new EncryptedPatientData({
+
+                    record_id:
+                      generateRecordId(),
+
+                    patient_id:
+                      row.patient_id,
+
+                    encrypted_age:
+                      encrypted.age,
+
+                    encrypted_gender:
+                      encrypted.gender,
+
+                    encrypted_disease:
+                      encrypted.disease,
+
+                    encrypted_blood_pressure:
+                      encrypted.blood_pressure,
+
+                    encrypted_risk_score:
+                      encrypted.risk_score,
+
+                    disease_category:
+                      row.disease,
+
+                    upload_source:
+                      'batch_csv',
+
+                    timestamp:
+                      new Date(),
+
+                  });
+
+
+
+                await record.save();
+
+
+
+                // ===============================
+                // AUDIT LOG
+                // ===============================
+
+                await AuditLog.create({
+
+                  action:
+                    'BATCH_UPLOAD',
+
+                  user:
+                    'data_owner',
+
+                  details:
+                    `Uploaded patient ${row.patient_id}`,
+
+                  status:
+                    'success'
+
+                });
+
+
+
+                uploaded++;
+
+              } catch (err) {
+
+                console.error(
+                  'ROW ERROR:',
+                  err.message
+                );
+
+                failed++;
+
+                errors.push({
+
+                  patient_id:
+                    row.patient_id || 'UNKNOWN',
+
+                  reason:
+                    err.message
+
+                });
+              }
+            }
+
+
+
+            // =====================================
+            // DELETE TEMP FILE
+            // =====================================
+
+            if (
+              fs.existsSync(req.file.path)
+            ) {
+
+              fs.unlinkSync(
+                req.file.path
+              );
+            }
+
+
+
+            // =====================================
+            // RESPONSE
+            // =====================================
+
+            res.json({
+
+              success: true,
+
+              summary: {
+
+                total_rows:
+                  rows.length,
+
+                uploaded,
+
+                failed
+
+              },
+
+              errors
+
+            });
+
+          } catch (processingError) {
+
+            console.error(
+              processingError
+            );
+
+            res.status(500).json({
+
+              success: false,
+
+              error:
+                processingError.message
+
+            });
+          }
+        });
+
+    } catch (err) {
+
+      console.error(err);
+
+      res.status(500).json({
+
+        success: false,
+
+        error:
+          err.message
+
+      });
+    }
+  }
+);
+
+
+
+// =====================================================
+// GET RECORDS
+// =====================================================
 
 app.get('/api/records', async (req, res) => {
 
   try {
 
-    const records = await EncryptedPatientData
-      .find()
-      .sort({ timestamp: -1 });
+    const records =
+      await EncryptedPatientData
+        .find()
+        .sort({ timestamp: -1 });
 
     res.json({
+
       success: true,
-      count: records.length,
+
+      count:
+        records.length,
+
       records
+
     });
 
   } catch (err) {
@@ -241,195 +640,399 @@ app.get('/api/records', async (req, res) => {
     console.error(err);
 
     res.status(500).json({
+
       success: false,
-      error: err.message
+
+      error:
+        err.message
+
     });
   }
 });
-// ─────────────────────────────────────────────
-// REQUEST FUNCTION KEY
-// ─────────────────────────────────────────────
 
-app.post('/api/request-key', (req, res) => {
-  const { user_id, function_type } = req.body;
 
-  const FUNCTION_VECTORS = {
-    average_age: [1, 0, 0, 0, 0],
 
-    disease_frequency: [0, 0, 1, 0, 0],
+// =====================================================
+// DASHBOARD STATS
+// =====================================================
 
-    average_risk_score: [0, 0, 0, 0, 1],
+app.get('/api/stats', async (req, res) => {
 
-    blood_pressure_avg: [0, 0, 0, 1, 0],
-  };
-
-  if (!FUNCTION_VECTORS[function_type]) {
-    return res.status(400).json({
-      error: 'Invalid function type',
-    });
-  }
-
-  const function_key = Buffer.from(
-    JSON.stringify({
-      function_type,
-      vector: FUNCTION_VECTORS[function_type],
-      issued_at: Date.now(),
-    })
-  ).toString('base64');
-
-  audit(
-    'KEYGEN',
-    user_id,
-    `Generated key for ${function_type}`,
-    'success'
-  );
-
-  res.json({
-    success: true,
-    function_key,
-    vector: FUNCTION_VECTORS[function_type],
-  });
-});
-
-// ─────────────────────────────────────────────
-// COMPUTE ROUTE
-// ─────────────────────────────────────────────
-
-app.post('/api/compute', async (req, res) => {
   try {
-    const { function_type } = req.body;
 
     const totalRecords =
-      await EncryptedPatientData.countDocuments();
+      await EncryptedPatientData
+        .countDocuments();
+
+
+
+    const totalComputations =
+      await ComputationResult
+        .countDocuments();
+
+
+
+    const today =
+      new Date();
+
+    today.setHours(0, 0, 0, 0);
+
+
+
+    const todayEncryptions =
+      await EncryptedPatientData
+        .countDocuments({
+
+          timestamp: {
+
+            $gte: today
+
+          }
+
+        });
+
+
+
+    res.json({
+
+      success: true,
+
+      stats: {
+
+        totalRecords,
+
+        todayEncryptions,
+
+        activeMPCSessions: 3,
+
+        totalComputations
+
+      }
+
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+
+      success: false,
+
+      error:
+        err.message
+
+    });
+  }
+});
+
+
+
+// =====================================================
+// DASHBOARD ANALYTICS
+// =====================================================
+
+app.get(
+  '/api/dashboard-analytics',
+
+  async (req, res) => {
+
+    try {
+
+      const records =
+        await EncryptedPatientData
+          .find();
+
+
+
+      // =====================================
+      // ENCRYPTION GRAPH
+      // =====================================
+
+      const encryptionData = [
+
+        { day: 'Mon', records: 0 },
+        { day: 'Tue', records: 0 },
+        { day: 'Wed', records: 0 },
+        { day: 'Thu', records: 0 },
+        { day: 'Fri', records: 0 },
+        { day: 'Sat', records: 0 },
+        { day: 'Sun', records: 0 },
+
+      ];
+
+
+
+      records.forEach(record => {
+
+        const d =
+          new Date(record.timestamp);
+
+        const dayIndex =
+          d.getDay();
+
+        const fixedIndex =
+          dayIndex === 0
+            ? 6
+            : dayIndex - 1;
+
+        encryptionData[
+          fixedIndex
+        ].records++;
+
+      });
+
+
+
+      // =====================================
+      // DISEASE DISTRIBUTION
+      // =====================================
+
+      const diseaseMap = {};
+
+      records.forEach(record => {
+
+        const disease =
+          record.disease_category ||
+          'Unknown';
+
+        diseaseMap[disease] =
+          (diseaseMap[disease] || 0) + 1;
+
+      });
+
+
+
+      const diseaseDistribution =
+        Object.keys(diseaseMap)
+          .map(key => ({
+
+            name: key,
+
+            value:
+              diseaseMap[key]
+
+          }));
+
+
+
+      // =====================================
+      // RECENT ACTIVITY
+      // =====================================
+
+      const recentActivity =
+        records
+          .slice(-5)
+          .reverse()
+          .map(record => ({
+
+            id:
+              record.record_id,
+
+            type:
+              'ENCRYPT',
+
+            func:
+              'Patient Record Encryption',
+
+            user:
+              'data_owner',
+
+            status:
+              'completed',
+
+            time:
+              new Date(
+                record.timestamp
+              ).toLocaleTimeString()
+
+          }));
+
+
+
+      res.json({
+
+        success: true,
+
+        analytics: {
+
+          encryptionData,
+
+          diseaseDistribution,
+
+          recentActivity
+
+        }
+
+      });
+
+    } catch (err) {
+
+      console.error(err);
+
+      res.status(500).json({
+
+        success: false,
+
+        error:
+          err.message
+
+      });
+    }
+  }
+);
+
+
+
+// =====================================================
+// AUDIT LOGS
+// =====================================================
+
+app.get('/api/audit-logs', async (req, res) => {
+
+  try {
+
+    const logs =
+      await AuditLog
+        .find()
+        .sort({ timestamp: -1 })
+        .limit(20);
+
+    res.json({
+
+      success: true,
+
+      logs
+
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+
+      success: false,
+
+      error:
+        err.message
+
+    });
+  }
+});
+
+
+
+// =====================================================
+// COMPUTE
+// =====================================================
+
+app.post('/api/compute', async (req, res) => {
+
+  try {
+
+    const {
+      function_type
+    } = req.body;
 
     let result = {};
 
-    if (function_type === 'average_age') {
+
+
+    if (
+      function_type ===
+      'average_age'
+    ) {
+
       result = {
+
         value: 52.3,
+
         unit: 'years',
+
       };
     }
 
-    if (function_type === 'disease_frequency') {
+    else if (
+      function_type ===
+      'disease_frequency'
+    ) {
+
+      const diseaseData =
+        await EncryptedPatientData
+          .aggregate([
+
+            {
+
+              $group: {
+
+                _id:
+                  '$disease_category',
+
+                count:
+                  { $sum: 1 }
+
+              }
+
+            }
+
+          ]);
+
+
+
       result = {
-        diabetes: 15,
-        cardiac: 7,
-        hypertension: 12,
+
+        breakdown:
+          diseaseData.map(d => ({
+
+            name: d._id,
+
+            count: d.count
+
+          }))
+
       };
     }
 
-    const computation = new ComputationResult({
-      result_id: `COMP_${Date.now()}`,
 
-      function_type,
 
-      computed_value: result,
-    });
+    const computation =
+      new ComputationResult({
+
+        result_id:
+          `COMP_${Date.now()}`,
+
+        function_type,
+
+        computed_value:
+          result,
+
+      });
 
     await computation.save();
 
-    res.json({
-      success: true,
-      result,
-      totalRecords,
+
+
+    await AuditLog.create({
+
+      action: 'COMPUTE',
+
+      user: 'research_analyst',
+
+      details:
+        `Executed ${function_type}`,
+
+      status: 'success'
+
     });
-  } catch (err) {
-    console.error(err);
 
-    res.status(500).json({
-      error: err.message,
-    });
-  }
-});
 
-// ─────────────────────────────────────────────
-// MPC ROUTE
-// ─────────────────────────────────────────────
-
-app.post('/api/mpc/initiate', (req, res) => {
-  const {
-    institutions,
-    function_type,
-    threshold = 2,
-  } = req.body;
-
-  const session_id = `MPC_${Date.now()}`;
-
-  res.json({
-    success: true,
-    session_id,
-    institutions,
-    function_type,
-    threshold,
-    status: 'initiated',
-  });
-});
-
-// ─────────────────────────────────────────────
-// GET RECORDS
-// ─────────────────────────────────────────────
-
-app.get('/api/records', async (req, res) => {
-  try {
-    const records =
-      await EncryptedPatientData.find()
-        .sort({ timestamp: -1 })
-        .limit(100);
-
-    const total =
-      await EncryptedPatientData.countDocuments();
-
-    res.json({
-      success: true,
-      total,
-      records,
-    });
-  } catch (err) {
-    console.error(err);
-
-    res.status(500).json({
-      error: err.message,
-    });
-  }
-});
-// ============================================
-// DASHBOARD STATS
-// ============================================
-
-app.get('/api/stats', async (req, res) => {
-
-  try {
-
-    const totalRecords =
-      await EncryptedPatientData.countDocuments();
-
-    const today = new Date();
-
-    today.setHours(0, 0, 0, 0);
-
-    const todayEncryptions =
-      await EncryptedPatientData.countDocuments({
-
-        timestamp: { $gte: today }
-
-      });
 
     res.json({
 
       success: true,
 
-      stats: {
-
-        totalRecords,
-
-        todayEncryptions,
-
-        activeMPCSessions: 3,
-
-        totalComputations: 12
-
-      }
+      result
 
     });
 
@@ -440,48 +1043,36 @@ app.get('/api/stats', async (req, res) => {
     res.status(500).json({
 
       success: false,
-      error: err.message
+
+      error:
+        err.message
 
     });
   }
 });
-// ─────────────────────────────────────────────
-// GET STATS
-// ─────────────────────────────────────────────
 
-app.get('/api/stats', async (req, res) => {
+
+
+// =====================================================
+// GET RESULTS
+// =====================================================
+
+app.get('/api/results', async (req, res) => {
 
   try {
 
-    const totalRecords =
-      await EncryptedPatientData.countDocuments();
-
-    const today = new Date();
-
-    today.setHours(0, 0, 0, 0);
-
-    const todayEncryptions =
-      await EncryptedPatientData.countDocuments({
-
-        timestamp: { $gte: today }
-
-      });
+    const results =
+      await ComputationResult
+        .find()
+        .sort({
+          generated_time: -1
+        });
 
     res.json({
 
       success: true,
 
-      stats: {
-
-        totalRecords,
-
-        todayEncryptions,
-
-        activeMPCSessions: 3,
-
-        totalComputations: 12
-
-      }
+      results
 
     });
 
@@ -492,45 +1083,123 @@ app.get('/api/stats', async (req, res) => {
     res.status(500).json({
 
       success: false,
-      error: err.message
+
+      error:
+        err.message
 
     });
   }
 });
 
-// ─────────────────────────────────────────────
-// AUDIT LOGS
-// ─────────────────────────────────────────────
 
-app.get('/api/audit', (req, res) => {
-  res.json({
-    total: auditLogs.length,
-    logs: auditLogs,
-  });
-});
 
-// ─────────────────────────────────────────────
+// =====================================================
+// MPC SESSION
+// =====================================================
+
+app.post(
+  '/api/mpc/initiate',
+
+  async (req, res) => {
+
+    try {
+
+      const {
+
+        institutions,
+        function_type,
+        threshold = 2
+
+      } = req.body;
+
+
+
+      const session_id =
+        `MPC_${Date.now()}`;
+
+
+
+      await AuditLog.create({
+
+        action: 'MPC',
+
+        user: 'admin',
+
+        details:
+          `Started MPC session ${session_id}`,
+
+        status: 'success'
+
+      });
+
+
+
+      res.json({
+
+        success: true,
+
+        session_id,
+
+        institutions,
+
+        function_type,
+
+        threshold,
+
+        status: 'initiated',
+
+      });
+
+    } catch (err) {
+
+      console.error(err);
+
+      res.status(500).json({
+
+        success: false,
+
+        error:
+          err.message
+
+      });
+    }
+  }
+);
+
+
+
+// =====================================================
 // START SERVER
-// ─────────────────────────────────────────────
+// =====================================================
 
 mongoose
   .connect(MONGODB_URI)
+
   .then(() => {
-    console.log('MongoDB Connected');
+
+    console.log(
+      'MongoDB Connected'
+    );
 
     app.listen(PORT, () => {
+
       console.log(
         `Backend running on http://localhost:${PORT}`
       );
+
     });
   })
+
   .catch((err) => {
+
     console.error(err);
 
     app.listen(PORT, () => {
+
       console.log(
-        `🚀 Backend running WITHOUT MongoDB on http://localhost:${PORT}`
+        `Backend running WITHOUT MongoDB on http://localhost:${PORT}`
       );
+
     });
   });
 

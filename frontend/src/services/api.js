@@ -27,7 +27,8 @@ export const computeFunction = (payload) => API.post('/compute', payload);
 export const initiateMPC = (payload) => API.post('/mpc/initiate', payload);
 
 // --- Audit ---
-export const getAuditLogs = () => API.get('/audit');
+export const getAuditLogs =
+  () => api.get('/api/audit-logs');
 export const getComputationResults = () => API.get('/compute/results');
 
 // --- Stats (for dashboard) ---

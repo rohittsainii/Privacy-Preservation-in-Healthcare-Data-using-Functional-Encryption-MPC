@@ -1,3 +1,4 @@
+import Papa from 'papaparse';
 import React, { useState } from 'react';
 import { Card, Button, Input, Select, Alert, Badge, MonoValue, Spinner } from '../components/UI';
 
@@ -13,7 +14,8 @@ export default function EncryptPage() {
   const [file, setFile] = useState(null);
   const [encrypting, setEncrypting] = useState(false);
   const [result, setResult] = useState(null);
-  const [batchResults, setBatchResults] = useState([]);
+  const [batchResults, setBatchResults] = useState(null);
+  const [csvData, setCsvData] = useState([]);
   const [error, setError] = useState('');
 
   const handleSingleEncrypt = async () => {
@@ -121,27 +123,178 @@ export default function EncryptPage() {
 };
 
   const handleFileSelect = (e) => {
-    const f = e.target.files[0];
-    setFile(f);
-    setBatchResults([]);
-  };
+
+  const f = e.target.files[0];
+
+  if (!f) return;
+
+  setFile(f);
+
+  setBatchResults(null);
+
+  Papa.parse(f, {
+
+    header: true,
+
+    skipEmptyLines: true,
+
+    complete: (results) => {
+
+      console.log(
+        'PARSED:',
+        results
+      );
+
+      const cleaned =
+        results.data.filter(row =>
+          row.patient_id
+        );
+
+      console.log(
+        'CLEANED:',
+        cleaned
+      );
+
+      setCsvData(cleaned);
+
+      alert(
+        `Loaded ${cleaned.length} records`
+      );
+    },
+
+    error: (err) => {
+
+      console.error(err);
+
+      alert(
+        'CSV parsing failed'
+      );
+    }
+
+  });
+};
 
   const handleBatchEncrypt = async () => {
-    if (!file) { setError('Please select a CSV file.'); return; }
-    setEncrypting(true);
-    setError('');
-    await new Promise(r => setTimeout(r, 2000));
+  console.log(csvData);
+  if (!file) {
 
-    // Simulate batch encryption
-    const count = Math.floor(Math.random() * 50) + 20;
-    const results = Array.from({ length: Math.min(5, count) }, (_, i) => ({
-      record_id: `rec_${(Date.now() + i).toString(36).toUpperCase()}`,
-      patient_id: `P${1000 + i}`,
-      status: 'encrypted',
-    }));
-    setBatchResults({ total: count, sample: results });
+    alert('Upload CSV first');
+    return;
+  }
+
+  try {
+
+    setEncrypting(true);
+
+    let successCount = 0;
+
+    const sampleRecords = [];
+
+
+
+    for (const row of csvData || []) {
+
+      try {
+
+        const response = await fetch(
+
+          'http://localhost:5000/api/encrypt',
+
+          {
+            method: 'POST',
+
+            headers: {
+              'Content-Type':
+                'application/json'
+            },
+
+            body: JSON.stringify({
+
+              patient_id:
+                row.patient_id,
+
+              age:
+                Number(row.age),
+
+              gender:
+                Number(row.gender),
+
+              disease:
+                Number(row.disease),
+
+              blood_pressure:
+                Number(
+                  row.blood_pressure
+                ),
+
+              risk_score:
+                Number(
+                  row.risk_score
+                ),
+
+            })
+
+          }
+        );
+
+
+
+        const data =
+          await response.json();
+
+
+
+        if (data.success) {
+
+          successCount++;
+
+          if (
+            sampleRecords.length < 5
+          ) {
+
+            sampleRecords.push({
+
+              id: data.record_id,
+
+              patient:
+                row.patient_id,
+
+            });
+          }
+        }
+
+      } catch (err) {
+
+        console.error(
+          'Batch row failed:',
+          err
+        );
+      }
+    }
+
+
+
+    setBatchResults({
+
+      count: successCount,
+
+      records: sampleRecords,
+
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    alert(
+      'Batch upload failed'
+    );
+
+  } finally {
+
     setEncrypting(false);
-  };
+  }
+};
 
   return (
     <div style={{ padding: '28px 32px', maxWidth: 900, margin: '0 auto' }}>
@@ -157,7 +310,7 @@ export default function EncryptPage() {
       {/* Mode Toggle */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
         {['single', 'batch'].map(m => (
-          <button key={m} onClick={() => { setMode(m); setResult(null); setBatchResults([]); setError(''); }}
+          <button key={m} onClick={() => { setMode(m); setResult(null); setBatchResults(null); setError(''); }}
             style={{
               padding: '8px 20px', borderRadius: 8, cursor: 'pointer', transition: 'all 0.15s',
               background: mode === m ? 'rgba(32,200,160,0.15)' : 'transparent',
@@ -170,7 +323,7 @@ export default function EncryptPage() {
         ))}
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: result || batchResults.total ? '1fr 1fr' : '1fr', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: result || batchResults?.count || 0 ? '1fr 1fr' : '1fr', gap: 20 }}>
         {/* Input Form */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16, animation: 'fadeInUp 0.45s ease' }}>
           {mode === 'single' ? (
@@ -258,7 +411,7 @@ export default function EncryptPage() {
         </div>
 
         {/* Result Panel */}
-        {(result || batchResults.total) && (
+        {(result || batchResults?.count || 0) && (
           <div style={{ animation: 'fadeInUp 0.4s ease' }}>
             {result && (
               <Card style={{ borderColor: 'rgba(32,200,160,0.25)' }}>
@@ -299,25 +452,137 @@ export default function EncryptPage() {
               </Card>
             )}
 
-            {batchResults.total && (
-              <Card style={{ borderColor: 'rgba(32,200,160,0.25)' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#20c8a0', boxShadow: '0 0 6px #20c8a0' }} />
-                  <span style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: '#20c8a0' }}>BATCH ENCRYPTION COMPLETE</span>
-                </div>
-                <div style={{ fontFamily: 'var(--font-display)', fontSize: 40, fontWeight: 700, color: 'var(--accent-primary)', marginBottom: 4 }}>
-                  {batchResults.total}
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 20 }}>records encrypted and stored</div>
-                <div style={{ fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--text-muted)', marginBottom: 8 }}>SAMPLE RECORDS</div>
-                {batchResults.sample.map(r => (
-                  <div key={r.record_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', background: 'var(--bg-elevated)', borderRadius: 6, marginBottom: 4 }}>
-                    <MonoValue style={{ fontSize: 10 }}>{r.record_id}</MonoValue>
-                    <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{r.patient_id}</span>
-                    <Badge variant="default" style={{ fontSize: 9 }}>✓ encrypted</Badge>
-                  </div>
-                ))}
-              </Card>
+            {batchResults && (
+  <Card
+    style={{
+      borderColor:
+        'rgba(32,200,160,0.25)'
+    }}
+  >
+
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        marginBottom: 20
+      }}
+    >
+
+      <div
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          background: '#20c8a0',
+          boxShadow:
+            '0 0 6px #20c8a0'
+        }}
+      />
+
+      <span
+        style={{
+          fontSize: 11,
+          fontFamily:
+            'var(--font-mono)',
+          color: '#20c8a0'
+        }}
+      >
+        BATCH ENCRYPTION COMPLETE
+      </span>
+
+    </div>
+
+
+
+    <div
+      style={{
+        fontFamily:
+          'var(--font-display)',
+        fontSize: 40,
+        fontWeight: 700,
+        color:
+          'var(--accent-primary)',
+        marginBottom: 4
+      }}
+    >
+      {batchResults.count}
+    </div>
+
+
+
+    <div
+      style={{
+        fontSize: 12,
+        color: 'var(--text-muted)',
+        marginBottom: 20
+      }}
+    >
+      records encrypted and stored
+    </div>
+
+
+
+    <div
+      style={{
+        fontSize: 11,
+        fontFamily:
+          'var(--font-mono)',
+        color: 'var(--text-muted)',
+        marginBottom: 8
+      }}
+    >
+      SAMPLE RECORDS
+    </div>
+
+
+
+    {(batchResults.records || [])
+      .map((r, i) => (
+
+      <div
+        key={i}
+        style={{
+          display: 'flex',
+          justifyContent:
+            'space-between',
+          alignItems: 'center',
+          padding: '6px 10px',
+          background:
+            'var(--bg-elevated)',
+          borderRadius: 6,
+          marginBottom: 4
+        }}
+      >
+
+        <MonoValue
+          style={{ fontSize: 10 }}
+        >
+          {r.id}
+        </MonoValue>
+
+        <span
+          style={{
+            fontSize: 10,
+            color:
+              'var(--text-muted)'
+          }}
+        >
+          {r.patient}
+        </span>
+
+        <Badge
+          variant="default"
+          style={{ fontSize: 9 }}
+        >
+          ✓ encrypted
+        </Badge>
+
+      </div>
+    ))}
+
+  </Card>
+
             )}
           </div>
         )}
