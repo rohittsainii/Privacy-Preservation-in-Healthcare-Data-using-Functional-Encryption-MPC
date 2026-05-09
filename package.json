@@ -3,5 +3,8 @@
     "csv-parser": "^3.2.1",
     "multer": "^2.1.1",
     "papaparse": "^5.5.3"
+  },
+  "devDependencies": {
+    "prettier": "^3.8.3"
   }
 }
