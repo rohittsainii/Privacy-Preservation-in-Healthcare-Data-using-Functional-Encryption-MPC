@@ -19,8 +19,6 @@ echo "======================================"
 echo "ALL SERVICES STARTED"
 echo "======================================"
 echo "Frontend  : http://localhost:5173"
-echo "Backend   : http://localhost:3000"
-echo "Crypto API: http://localhost:5001"
 echo "======================================"
 
 wait
